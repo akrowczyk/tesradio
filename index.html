@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#050505" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>TESRADIO</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
+</head>
+<body>
+  <div class="ambient" id="ambient"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12h2l2-7 4 14 3-10 2 5h5"/>
+        </svg>
+      </div>
+      <div>
+        <h1>TESRADIO</h1>
+        <p class="brand-sub">Custom radio for your Tesla</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="fullscreenBtn" title="Fullscreen" aria-label="Fullscreen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+      </button>
+      <button class="primary-btn" id="addBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <span>Add Station</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <!-- NOW PLAYING -->
+    <section class="now-playing" id="nowPlaying">
+      <div class="art-wrap">
+        <div class="art" id="art">
+          <span class="art-emoji" id="artEmoji">📡</span>
+        </div>
+        <div class="eq" id="eq" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="live" id="live"><span class="dot"></span>LIVE</div>
+        <h2 class="station-name" id="stationName">Select a station</h2>
+        <p class="station-genre" id="stationGenre">Tap a station from the list to start playing</p>
+      </div>
+
+      <div class="controls">
+        <button class="ctrl-btn" id="prevBtn" title="Previous" aria-label="Previous">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+        </button>
+        <button class="play-btn" id="playBtn" title="Play/Pause" aria-label="Play">
+          <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+          <svg id="loadIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:none" class="spin"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg>
+        </button>
+        <button class="ctrl-btn" id="nextBtn" title="Next" aria-label="Next">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+        </button>
+      </div>
+
+      <div class="volume">
+        <button class="icon-btn" id="muteBtn" aria-label="Mute">
+          <svg id="volIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          <svg id="muteIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+        </button>
+        <input type="range" id="volSlider" min="0" max="100" value="80" aria-label="Volume" />
+        <span class="vol-pct" id="volPct">80</span>
+      </div>
+    </section>
+
+    <!-- STATION LIST -->
+    <section class="stations">
+      <div class="stations-head">
+        <h3>Stations</h3>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="searchInput" placeholder="Search stations..." />
+        </div>
+      </div>
+      <ul class="station-list" id="stationList"></ul>
+    </section>
+  </main>
+
+  <!-- Modal: Add / Edit Station -->
+  <div class="modal-backdrop" id="modal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
+      <div class="modal-head">
+        <h2 id="modalTitle">Add Station</h2>
+        <button class="icon-btn" id="modalClose" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <form id="stationForm" class="modal-body">
+        <input type="hidden" id="fId" />
+        <label>
+          <span>Name</span>
+          <input type="text" id="fName" required placeholder="e.g. Groove Salad" />
+        </label>
+        <label>
+          <span>Stream URL <em>(must be https)</em></span>
+          <input type="url" id="fUrl" required placeholder="https://ice1.somafm.com/groovesalad-128-mp3" />
+        </label>
+        <label>
+          <span>Genre / description</span>
+          <input type="text" id="fGenre" placeholder="Ambient, downtempo" />
+        </label>
+        <div class="row">
+          <label>
+            <span>Emoji</span>
+            <input type="text" id="fEmoji" maxlength="2" placeholder="📡" />
+          </label>
+          <label>
+            <span>Color</span>
+            <input type="color" id="fColor" value="#7c5cff" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="deleteBtn" style="display:none">Delete</button>
+          <div class="spacer"></div>
+          <button type="button" class="ghost-btn" id="cancelBtn">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <audio id="audio" preload="none" crossorigin="anonymous"></audio>
+
+  <script src="app.js"></script>
+</body>
+</html>
