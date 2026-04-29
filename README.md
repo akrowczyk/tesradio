@@ -30,8 +30,7 @@ Out of the box the app seeds two St. Augustine, FL stations:
 
 | Station | Frequency | Format |
 |---|---|---|
-| **Beach 105.5** (WBHU) | 105.5 FM | Adult hits |
-| **WSOS 103.9** (W280EY / WSOS-AM 1170) | 103.9 FM | Classic hits 60s/70s/80s + local news |
+| **Beach 105.5** (WBHU) | 105.5 FM | Adult hits, St. Augustine |
 | **Sunny 105.9** (WOCL, HLS) | 105.9 FM | 80s/90s/2000s classic hits, Orlando |
 
 Both stream over HTTPS so they work inside the Tesla browser. Edit `DEFAULT_STATIONS` in [`app.js`](./app.js) to seed your own.
@@ -105,14 +104,14 @@ Three files, no build step:
 
 ## 📦 Storage
 
-Everything lives under the `tesradio.v2` prefix in `localStorage`:
+Everything lives under the `tesradio.v3` prefix in `localStorage`:
 
 | Key | Purpose |
 |---|---|
-| `tesradio.v2.stations` | Your full station list (defaults + custom) |
-| `tesradio.v2.current` | ID of the last-played station |
-| `tesradio.v2.volume` | Volume between 0 and 1 |
-| `tesradio.v2.dismissedDefaults` | Default stations you've deleted (so they don't get re-seeded on reload) |
+| `tesradio.v3.stations` | Your full station list (defaults + custom) |
+| `tesradio.v3.current` | ID of the last-played station |
+| `tesradio.v3.volume` | Volume between 0 and 1 |
+| `tesradio.v3.dismissedDefaults` | Default stations you've deleted (so they don't get re-seeded on reload) |
 
 Clearing site data resets the app to factory defaults.
 

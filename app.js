@@ -1,6 +1,6 @@
 // TESRADIO - vanilla JS radio player
 
-const STORAGE_KEY = 'tesradio.v2';
+const STORAGE_KEY = 'tesradio.v3';
 
 const DEFAULT_STATIONS = [
   {
@@ -10,14 +10,6 @@ const DEFAULT_STATIONS = [
     genre: 'WBHU · Adult hits · St. Augustine, FL',
     emoji: '🏖️',
     color: '#06b6d4',
-  },
-  {
-    id: 'wsos-1039',
-    name: 'WSOS 103.9',
-    url: 'https://stream.surfernetwork.com/rfahthcep9jtv',
-    genre: 'Classic hits · 60s · 70s · 80s · St. Augustine, FL',
-    emoji: '🎙️',
-    color: '#f59e0b',
   },
   {
     id: 'sunny-1059',
