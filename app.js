@@ -19,6 +19,14 @@ const DEFAULT_STATIONS = [
     emoji: '🎙️',
     color: '#f59e0b',
   },
+  {
+    id: 'sunny-1059',
+    name: 'Sunny 105.9',
+    url: 'https://live.amperwave.net/manifest/audacy-woclfmaac-hlsc.m3u8',
+    genre: 'WOCL · 80s/90s/2000s classic hits · Orlando, FL',
+    emoji: '☀️',
+    color: '#fbbf24',
+  },
 ];
 
 // ---------- State ----------
@@ -197,6 +205,45 @@ function setPlayUI(state) {
   els.nowPlaying.classList.toggle('playing', state === 'play');
 }
 
+// ---------- HLS support ----------
+let hls = null; // active Hls instance, if any
+
+function isHlsUrl(url) {
+  return /\.m3u8(\?|$)/i.test(url);
+}
+
+function destroyHls() {
+  if (hls) {
+    try { hls.destroy(); } catch {}
+    hls = null;
+  }
+}
+
+function attachStream(url) {
+  destroyHls();
+  if (isHlsUrl(url)) {
+    if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+      // Native HLS (Safari)
+      audio.src = url;
+      audio.load();
+    } else if (window.Hls && window.Hls.isSupported()) {
+      hls = new window.Hls({ lowLatencyMode: false, enableWorker: true });
+      hls.loadSource(url);
+      hls.attachMedia(audio);
+      hls.on(window.Hls.Events.ERROR, (_evt, data) => {
+        if (data.fatal && userIntentPlay) scheduleReconnect('hls error');
+      });
+    } else {
+      // hls.js not yet loaded — fall back to native (will likely fail) and let reconnect retry
+      audio.src = url;
+      audio.load();
+    }
+  } else {
+    audio.src = url;
+    audio.load();
+  }
+}
+
 // ---------- Playback ----------
 function clearReconnect() {
   if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -220,8 +267,10 @@ function scheduleReconnect(reason) {
     const s = getCurrent();
     if (!s) return;
     try {
-      audio.src = s.url + (s.url.includes('?') ? '&' : '?') + '_=' + Date.now();
-      audio.load();
+      // For HLS, hls.js manages its own reconnection internally; for plain
+      // streams, append a cache-busting param to force a fresh request.
+      const url = isHlsUrl(s.url) ? s.url : s.url + (s.url.includes('?') ? '&' : '?') + '_=' + Date.now();
+      attachStream(url);
       audio.play().catch(() => scheduleReconnect('play failed'));
     } catch {
       scheduleReconnect('exception');
@@ -241,9 +290,8 @@ function playStation(id) {
   renderNowPlaying();
   renderStations();
 
-  if (switching || audio.src !== s.url) {
-    audio.src = s.url;
-    audio.load();
+  if (switching || (audio.src !== s.url && !hls)) {
+    attachStream(s.url);
   }
   isLoading = true;
   setPlayUI('load');
@@ -267,7 +315,7 @@ function togglePlay() {
     if (s) els.stationGenre.textContent = s.genre || '';
   } else {
     userIntentPlay = true;
-    if (!audio.src) audio.src = s.url;
+    if (!audio.src && !hls) attachStream(s.url);
     isLoading = true;
     setPlayUI('load');
     audio.play().catch(() => scheduleReconnect('play failed'));
@@ -374,6 +422,7 @@ function deleteCurrent() {
   if (currentId === id) {
     userIntentPlay = false;
     clearReconnect();
+    destroyHls();
     audio.pause();
     audio.src = '';
     currentId = null;
@@ -675,8 +724,9 @@ setVolume(loadVolume());
 renderStations();
 renderNowPlaying();
 
-// If we have a previously selected station, preload but don't autoplay (browsers block it)
+// If we have a previously selected station, preload but don't autoplay (browsers block it).
+// For HLS we wait until user taps play so hls.js definitely loaded, then attachStream runs.
 if (currentId) {
   const s = getCurrent();
-  if (s) audio.src = s.url;
+  if (s && !isHlsUrl(s.url)) audio.src = s.url;
 }

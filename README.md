@@ -12,6 +12,7 @@ A slick, dark-themed custom internet radio web app built for the Tesla browser. 
 - **Big touch targets** — 84px play button, 56px prev/next, 44px controls
 - **Add, edit, delete favorite stations** — name, stream URL, genre, emoji, accent color
 - **Discover dialog** — search 30,000+ stations from [radio-browser.info](https://www.radio-browser.info/) and add with one tap
+- **HLS support** via [hls.js](https://github.com/video-dev/hls.js) — many modern stations (Audacy, NPR member stations, etc.) ship `.m3u8` HLS streams that the Tesla Chromium browser can't play natively
 - **Auto-reconnect** with exponential backoff — survives cell-coverage drops and brief network blips on the road
 - **Installable PWA** — add to your Tesla launcher for full-screen, no-URL-bar launch
 - **Per-station ambient gradient** — the whole UI shifts color to match the active station
@@ -31,6 +32,7 @@ Out of the box the app seeds two St. Augustine, FL stations:
 |---|---|---|
 | **Beach 105.5** (WBHU) | 105.5 FM | Adult hits |
 | **WSOS 103.9** (W280EY / WSOS-AM 1170) | 103.9 FM | Classic hits 60s/70s/80s + local news |
+| **Sunny 105.9** (WOCL, HLS) | 105.9 FM | 80s/90s/2000s classic hits, Orlando |
 
 Both stream over HTTPS so they work inside the Tesla browser. Edit `DEFAULT_STATIONS` in [`app.js`](./app.js) to seed your own.
 
