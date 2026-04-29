@@ -30,6 +30,12 @@ let isMuted = false;
 let lastVolume = 0.8;
 let searchQuery = '';
 
+// Auto-reconnect tracking
+let userIntentPlay = false;
+let reconnectAttempt = 0;
+let reconnectTimer = null;
+let isReconnecting = false;
+
 // ---------- Elements ----------
 const audio = document.getElementById('audio');
 const $ = (id) => document.getElementById(id);
@@ -70,6 +76,11 @@ const els = {
   fGenre: $('fGenre'),
   fEmoji: $('fEmoji'),
   fColor: $('fColor'),
+  discoverBtn: $('discoverBtn'),
+  discoverModal: $('discoverModal'),
+  discoverClose: $('discoverClose'),
+  discoverInput: $('discoverInput'),
+  discoverList: $('discoverList'),
 };
 
 // ---------- Storage ----------
@@ -187,12 +198,45 @@ function setPlayUI(state) {
 }
 
 // ---------- Playback ----------
+function clearReconnect() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  reconnectAttempt = 0;
+  isReconnecting = false;
+  els.nowPlaying.classList.remove('reconnecting');
+}
+
+function scheduleReconnect(reason) {
+  if (!userIntentPlay) return;
+  isReconnecting = true;
+  reconnectAttempt++;
+  // exponential backoff: 1s, 1.6s, 2.6s, 4.1s, ... capped at 20s
+  const delay = Math.min(20000, Math.round(1000 * Math.pow(1.6, reconnectAttempt - 1)));
+  els.nowPlaying.classList.add('reconnecting');
+  setPlayUI('load');
+  els.stationGenre.textContent = `Reconnecting · attempt ${reconnectAttempt}${reason ? ` · ${reason}` : ''}`;
+  reconnectTimer = setTimeout(() => {
+    if (!userIntentPlay) return;
+    const s = getCurrent();
+    if (!s) return;
+    try {
+      audio.src = s.url + (s.url.includes('?') ? '&' : '?') + '_=' + Date.now();
+      audio.load();
+      audio.play().catch(() => scheduleReconnect('play failed'));
+    } catch {
+      scheduleReconnect('exception');
+    }
+  }, delay);
+}
+
 function playStation(id) {
   const s = stations.find((x) => x.id === id);
   if (!s) return;
   const switching = currentId !== id;
   currentId = id;
   localStorage.setItem(STORAGE_KEY + '.current', id);
+  userIntentPlay = true;
+  clearReconnect();
 
   renderNowPlaying();
   renderStations();
@@ -205,10 +249,7 @@ function playStation(id) {
   setPlayUI('load');
   audio.play().catch((err) => {
     console.error('Playback failed:', err);
-    isLoading = false;
-    isPlaying = false;
-    setPlayUI('paused');
-    els.stationGenre.textContent = 'Could not play this stream — check the URL.';
+    scheduleReconnect('initial');
   });
 }
 
@@ -218,17 +259,18 @@ function togglePlay() {
     if (stations.length) playStation(stations[0].id);
     return;
   }
-  if (isPlaying) {
+  if (isPlaying || isReconnecting) {
+    userIntentPlay = false;
+    clearReconnect();
     audio.pause();
+    setPlayUI('paused');
+    if (s) els.stationGenre.textContent = s.genre || '';
   } else {
+    userIntentPlay = true;
     if (!audio.src) audio.src = s.url;
     isLoading = true;
     setPlayUI('load');
-    audio.play().catch((err) => {
-      console.error('Playback failed:', err);
-      isLoading = false;
-      setPlayUI('paused');
-    });
+    audio.play().catch(() => scheduleReconnect('play failed'));
   }
 }
 
@@ -330,11 +372,14 @@ function deleteCurrent() {
     localStorage.setItem(key, JSON.stringify(dismissed));
   }
   if (currentId === id) {
+    userIntentPlay = false;
+    clearReconnect();
     audio.pause();
     audio.src = '';
     currentId = null;
     localStorage.removeItem(STORAGE_KEY + '.current');
     renderNowPlaying();
+    setPlayUI('paused');
   }
   renderStations();
   closeModal();
@@ -389,19 +434,31 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'ArrowUp') { e.preventDefault(); setVolume(audio.volume + 0.05); }
   else if (e.code === 'ArrowDown') { e.preventDefault(); setVolume(audio.volume - 0.05); }
   else if (e.key === 'm' || e.key === 'M') toggleMute();
-  else if (e.key === 'Escape') closeModal();
+  else if (e.key === 'Escape') { closeModal(); closeDiscover(); }
 });
 
 // Audio events
 audio.addEventListener('playing', () => {
   isPlaying = true;
   isLoading = false;
+  clearReconnect();
   setPlayUI('play');
+  // restore station genre text on successful (re)connect
+  const s = getCurrent();
+  if (s) els.stationGenre.textContent = s.genre || '';
 });
 audio.addEventListener('pause', () => {
   isPlaying = false;
   isLoading = false;
-  setPlayUI('paused');
+  // If user-initiated pause, leave reconnect cleared. If unexpected pause
+  // mid-playback (e.g. stream cut), togglePlay won't fire — only treat as
+  // dropout if userIntentPlay is still true.
+  if (userIntentPlay && !audio.ended) {
+    // browser may pause on stream end / network blip — try to reconnect
+    scheduleReconnect('paused unexpectedly');
+  } else {
+    setPlayUI('paused');
+  }
 });
 audio.addEventListener('waiting', () => {
   isLoading = true;
@@ -410,10 +467,29 @@ audio.addEventListener('waiting', () => {
 audio.addEventListener('error', () => {
   isPlaying = false;
   isLoading = false;
-  setPlayUI('paused');
-  els.stationGenre.textContent = 'Stream error — try another station.';
+  if (userIntentPlay) {
+    scheduleReconnect('error');
+  } else {
+    setPlayUI('paused');
+    els.stationGenre.textContent = 'Stream error — try another station.';
+  }
 });
 audio.addEventListener('stalled', () => setPlayUI('load'));
+audio.addEventListener('ended', () => {
+  // Live streams shouldn't end. If they do, reconnect.
+  if (userIntentPlay) scheduleReconnect('ended');
+});
+
+// Page-visibility / online events for resilience
+window.addEventListener('online', () => {
+  if (userIntentPlay && !isPlaying) scheduleReconnect('back online');
+});
+document.addEventListener('visibilitychange', () => {
+  // When the tab becomes visible again, ensure stalled audio resumes
+  if (document.visibilityState === 'visible' && userIntentPlay && !isPlaying && !isReconnecting) {
+    scheduleReconnect('resumed');
+  }
+});
 
 // Media Session API (lock screen / car controls)
 if ('mediaSession' in navigator) {
@@ -435,6 +511,164 @@ function updateMediaSession() {
 }
 
 audio.addEventListener('playing', updateMediaSession);
+
+// ---------- Discover (radio-browser.info) ----------
+const RB_BASE = 'https://de1.api.radio-browser.info';
+const PALETTE = ['#7c5cff', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6', '#f97316'];
+const EMOJI_BY_TAG = [
+  [/jazz/i, '🎷'], [/rock|metal|punk/i, '🎸'], [/classical|orchestra/i, '🎻'],
+  [/country/i, '🤠'], [/hip.?hop|rap/i, '🎤'], [/electronic|edm|techno|house|trance/i, '🎛️'],
+  [/lofi|chill|ambient/i, '🌙'], [/news|talk/i, '📰'], [/sports/i, '⚽'],
+  [/pop/i, '🎶'], [/reggae/i, '🌴'], [/latin|salsa/i, '💃'],
+  [/oldies|classic/i, '📻'], [/christian|gospel/i, '✝️'], [/dance/i, '🪩'],
+];
+
+function pickEmoji(tags, name) {
+  const text = `${tags || ''} ${name || ''}`;
+  for (const [re, em] of EMOJI_BY_TAG) if (re.test(text)) return em;
+  return '📡';
+}
+
+function pickColor(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+
+let discoverAbort = null;
+let discoverDebounce = null;
+
+function openDiscover() {
+  els.discoverModal.classList.add('open');
+  els.discoverModal.setAttribute('aria-hidden', 'false');
+  els.discoverInput.value = '';
+  els.discoverList.innerHTML = '<li class="discover-empty">Type to search 30,000+ stations.</li>';
+  setTimeout(() => els.discoverInput.focus(), 50);
+}
+
+function closeDiscover() {
+  els.discoverModal.classList.remove('open');
+  els.discoverModal.setAttribute('aria-hidden', 'true');
+  if (discoverAbort) discoverAbort.abort();
+}
+
+async function searchStations(q) {
+  if (discoverAbort) discoverAbort.abort();
+  discoverAbort = new AbortController();
+  els.discoverList.innerHTML = '<li class="discover-loading">Searching…</li>';
+  try {
+    const url = `${RB_BASE}/json/stations/search?name=${encodeURIComponent(q)}&hidebroken=true&order=clickcount&reverse=true&limit=40`;
+    const res = await fetch(url, { signal: discoverAbort.signal });
+    if (!res.ok) throw new Error('Network');
+    const data = await res.json();
+    renderDiscover(data);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    els.discoverList.innerHTML = `<li class="discover-empty">Search failed. Check your connection.</li>`;
+  }
+}
+
+function renderDiscover(results) {
+  if (!results || !results.length) {
+    els.discoverList.innerHTML = '<li class="discover-empty">No stations matched.</li>';
+    return;
+  }
+  // De-dupe by name+url, prefer https
+  const seen = new Set();
+  const cleaned = [];
+  for (const r of results) {
+    const url = r.url_resolved || r.url;
+    if (!url) continue;
+    const key = `${r.name.toLowerCase()}|${url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push({ ...r, _url: url });
+  }
+  const existingUrls = new Set(stations.map((s) => s.url));
+  els.discoverList.innerHTML = cleaned
+    .map((r) => {
+      const httpsOk = r._url.startsWith('https://');
+      const tags = (r.tags || '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 3);
+      const country = r.countrycode || r.country || '';
+      const codec = (r.codec || '').toUpperCase();
+      const bitrate = r.bitrate ? `${r.bitrate}k` : '';
+      const already = existingUrls.has(r._url);
+      return `
+      <li class="discover-item" data-uuid="${escapeAttr(r.stationuuid)}">
+        <div class="discover-thumb">${
+          r.favicon
+            ? `<img src="${escapeAttr(r.favicon)}" alt="" onerror="this.replaceWith(document.createTextNode('${escapeHtml(pickEmoji(r.tags, r.name))}'))" />`
+            : escapeHtml(pickEmoji(r.tags, r.name))
+        }</div>
+        <div class="discover-meta">
+          <div class="discover-name">${escapeHtml(r.name.trim() || 'Untitled')}</div>
+          <div class="discover-tags">
+            ${country ? `<span>${escapeHtml(country)}</span>` : ''}
+            ${codec ? `<span>${escapeHtml(codec)}${bitrate ? ' ' + bitrate : ''}</span>` : ''}
+            ${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}
+            ${!httpsOk ? '<span class="insecure">HTTP — won\'t work in Tesla</span>' : ''}
+          </div>
+        </div>
+        <button class="discover-add ${already ? 'added' : ''}"
+          data-action="add"
+          data-name="${escapeAttr(r.name.trim())}"
+          data-url="${escapeAttr(r._url)}"
+          data-tags="${escapeAttr(r.tags || '')}"
+          ${!httpsOk || already ? 'disabled' : ''}>
+          ${already ? '✓ Added' : '+ Add'}
+        </button>
+      </li>`;
+    })
+    .join('');
+}
+
+function addDiscovered(name, url, tags) {
+  const id = `rb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const station = {
+    id,
+    name,
+    url,
+    genre: tags.split(',').map((t) => t.trim()).filter(Boolean).slice(0, 3).join(' · '),
+    emoji: pickEmoji(tags, name),
+    color: pickColor(name),
+  };
+  stations.push(station);
+  saveStations();
+  renderStations();
+  return id;
+}
+
+els.discoverBtn.addEventListener('click', openDiscover);
+els.discoverClose.addEventListener('click', closeDiscover);
+els.discoverModal.addEventListener('click', (e) => {
+  if (e.target === els.discoverModal) closeDiscover();
+});
+els.discoverInput.addEventListener('input', (e) => {
+  const q = e.target.value.trim();
+  if (discoverDebounce) clearTimeout(discoverDebounce);
+  if (!q) {
+    els.discoverList.innerHTML = '<li class="discover-empty">Type to search 30,000+ stations.</li>';
+    return;
+  }
+  discoverDebounce = setTimeout(() => searchStations(q), 300);
+});
+els.discoverList.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action="add"]');
+  if (!btn || btn.disabled) return;
+  addDiscovered(btn.dataset.name, btn.dataset.url, btn.dataset.tags || '');
+  btn.classList.add('added');
+  btn.disabled = true;
+  btn.textContent = '✓ Added';
+});
+
+// ---------- Service worker ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => {
+      console.warn('SW registration failed:', err);
+    });
+  });
+}
 
 // ---------- Init ----------
 setVolume(loadVolume());

@@ -11,9 +11,12 @@ A slick, dark-themed custom internet radio web app built for the Tesla browser. 
 - **Dark, glassy UI** tuned for Tesla's landscape touchscreen
 - **Big touch targets** — 84px play button, 56px prev/next, 44px controls
 - **Add, edit, delete favorite stations** — name, stream URL, genre, emoji, accent color
+- **Discover dialog** — search 30,000+ stations from [radio-browser.info](https://www.radio-browser.info/) and add with one tap
+- **Auto-reconnect** with exponential backoff — survives cell-coverage drops and brief network blips on the road
+- **Installable PWA** — add to your Tesla launcher for full-screen, no-URL-bar launch
 - **Per-station ambient gradient** — the whole UI shifts color to match the active station
 - **Live equalizer animation** while a station is playing
-- **Search/filter** across station name and genre
+- **Search/filter** across your saved station list
 - **Stations + last-played persist** in `localStorage` — no backend, no account, no tracking
 - **Keyboard shortcuts**: `space` play/pause · `←` `→` prev/next · `↑` `↓` volume · `M` mute · `Esc` close dialog
 - **Media Session API** — Tesla's steering-wheel buttons (and lock screens elsewhere) can control playback
@@ -75,9 +78,20 @@ If the official site doesn't publish a direct link, open the station's web playe
 ## 📱 Tesla-specific notes
 
 - Tesla browsers block autoplay until you tap something — first play always requires a tap.
-- Use **`https://` streams only**. Tesla refuses mixed content.
+- Use **`https://` streams only**. Tesla refuses mixed content. (The Discover dialog flags HTTP-only stations and disables their Add buttons.)
 - Tap the fullscreen button (top right) for edge-to-edge.
-- Streams that work great in-car: anything from [SomaFM](https://somafm.com/), [KEXP](https://kexp.org/), [Radio Paradise](https://radioparadise.com/), and most modern commercial stations served via Triton/StreamTheWorld.
+- After the first load, the service worker caches the app shell, so subsequent launches work even on flaky connections (the audio still needs network, of course).
+- The app **auto-reconnects** when the stream drops — you'll see a "Reconnecting · attempt N" message instead of having to tap play again. It backs off exponentially, capped at 20s between retries, until you manually pause or successfully reconnect.
+
+### Install to the Tesla launcher
+
+1. Visit your deployed URL in the Tesla browser.
+2. Tap the browser menu → "Add to home screen" / "Install app" (the wording varies by Tesla software version).
+3. Launch from the home-screen icon — it'll open full-screen, no URL bar.
+
+### Streams that work great in-car
+
+Anything from [SomaFM](https://somafm.com/), [KEXP](https://kexp.org/), [Radio Paradise](https://radioparadise.com/), and most modern commercial stations served via Triton/StreamTheWorld. Or just use the **Discover** button to browse the radio-browser.info catalog.
 
 ## 🎨 Customizing
 
