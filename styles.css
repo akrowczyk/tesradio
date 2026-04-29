@@ -157,17 +157,22 @@ input {
 
 .ghost-btn {
   height: 44px;
-  padding: 0 18px;
+  padding: 0 16px;
   border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
   font-weight: 500;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   transition: background 0.15s ease;
 }
 
 .ghost-btn:hover { background: var(--surface-2); }
+.ghost-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 /* Stage layout */
 .stage {
